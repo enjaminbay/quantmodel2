@@ -1,74 +1,111 @@
-from typing import Dict
+"""
+Backtesting engine for strategy evaluation.
+
+This module provides a robust backtesting framework with support for:
+- Position sizing based on signal strength
+- Transaction costs and slippage
+- Performance metrics calculation
+- Results export to Excel
+"""
+
+from typing import Dict, Optional, List
 import pandas as pd
+import numpy as np
 import os
 from datetime import datetime
+from pathlib import Path
 from quantmodel.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class BacktestEngine:
-    def __init__(self, initial_capital: float = 100000.0, ticker: str ='NONE'):
+    """
+    Backtesting engine for evaluating trading strategies.
+
+    Features:
+    - Dynamic position sizing based on signals
+    - Transaction cost modeling
+    - Performance analytics
+    - Trade tracking and reporting
+    """
+
+    def __init__(
+        self,
+        initial_capital: float = 100000.0,
+        ticker: str = 'NONE',
+        commission: float = 0.001,
+        slippage: float = 0.0005
+    ):
+        """
+        Initialize the backtest engine.
+
+        Args:
+            initial_capital: Starting capital in dollars
+            ticker: Stock ticker symbol
+            commission: Commission rate (default 0.1%)
+            slippage: Slippage rate (default 0.05%)
+        """
         self.initial_capital = initial_capital
         self.current_capital = initial_capital
         self.ticker = ticker
+        self.commission = commission
+        self.slippage = slippage
+
+        self.data: Optional[pd.DataFrame] = None
+        self.signals: Dict = {}
+        self.results: Optional[pd.DataFrame] = None
 
     def add_data(self, df: pd.DataFrame, signals: Dict) -> None:
-        """Add ticker data and signals"""
-        self.data = df
+        """
+        Add market data and trading signals.
+
+        Args:
+            df: DataFrame with price data and indicators
+            signals: Dictionary of trading signals by date
+        """
+        self.data = df.copy()
         self.signals = signals
-        logger.info(f"Loaded {len(df)} days of data")
-        logger.info(f"Loaded {len(signals)} signals")
+        logger.info(f"Loaded {len(df)} days of data with {len(signals)} signals")
 
     def run(self) -> pd.DataFrame:
-        """Run backtest and return results DataFrame"""
-        ticker = self.ticker
+        """
+        Execute the backtest and return results.
+
+        Returns:
+            DataFrame containing backtest results
+        """
+        if self.data is None or not self.signals:
+            raise ValueError("Must add data and signals before running backtest")
+
+        logger.info(f"Running backtest for {self.ticker}")
+
         results = []
         current_cash = self.initial_capital
-        previous_shares = 0
+        previous_shares = 0.0
 
-        position_map = {
-            -2: 0.50,  # Strong sell = 50%
-            -1: 0.625,  # Sell = 62.5%
-            0: 0.75,  # Neutral = 75%
-            1: 0.875,  # Buy = 87.5%
-            2: 1.0  # Strong buy = 100%
-        }
-        # position_map = {
-        #     -2: 0.0,  # Strong sell = 50%
-        #     -1: 0.25,  # Sell = 62.5%
-        #     0: 0.5,  # Neutral = 75%
-        #     1: 0.75,  # Buy = 87.5%
-        #     2: 1.0  # Strong buy = 100%
-        # }
+        position_map = self._get_position_map()
 
         for date in self.data.index:
             price = self.data.loc[date, 'Stock Price']
 
-            # Calculate current portfolio value FIRST using new price
             current_position_value = previous_shares * price
             portfolio_value = current_position_value + current_cash
 
-            # Get signal for this date
-            try:
-                signal = self.signals[date]['strength']
-            except:
-                logger.warning("Signal for date: " + str(date) + ' set to 0')
-                signal = 0
+            signal = self.signals.get(date, {}).get('strength', 0)
 
-            # Get position percentage based on signal
             position_pct = position_map.get(signal, 0.75)
 
-            # Calculate target position based on CURRENT portfolio value
             target_position_value = portfolio_value * position_pct
-            total_shares = target_position_value / price
+            total_shares = target_position_value / price if price > 0 else 0
             delta_shares = total_shares - previous_shares
 
-            # Execute trade
+            trade_cost = self._calculate_trade_cost(delta_shares, price)
             position_value = total_shares * price
-            cash_left = current_cash - (delta_shares * price)
+            cash_left = current_cash - (delta_shares * price) - trade_cost
 
-            # Store results
+            daily_return = (portfolio_value / self.initial_capital) - 1
+
             results.append({
                 'Date': date,
                 'Price': price,
@@ -77,126 +114,157 @@ class BacktestEngine:
                 'Position Value': position_value,
                 'Cash': cash_left,
                 'Portfolio Value': position_value + cash_left,
-                'Return': ((position_value + cash_left) / self.initial_capital) - 1
+                'Return': daily_return,
+                'Trade Cost': trade_cost,
+                'Shares Traded': delta_shares
             })
 
-            # Update for next iteration
             previous_shares = total_shares
             current_cash = cash_left
 
-        # Create DataFrame
-        results_df = pd.DataFrame(results)
+        self.results = pd.DataFrame(results)
+        self._save_results()
+        self._log_summary()
 
-        # Save to Excel
-        output_dir = os.path.join(os.getcwd(), 'backtest_results')
-        os.makedirs(output_dir, exist_ok=True)
-        output_path = os.path.join(output_dir, f"{ticker}_backtest_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
-        results_df.to_excel(output_path, index=False)
+        return self.results
 
-        # Log summary
-        logger.info(f"\nBacktest Summary:")
-        logger.info(f"Total days: {len(results)}")
-        logger.info(f"Final portfolio value: ${results[-1]['Portfolio Value']:.2f}")
-        logger.info(f"Total return: {results[-1]['Return']:.2%}")
-        logger.info(f"Max portfolio value: ${results_df['Portfolio Value'].max():.2f}")
-        logger.info(f"Min portfolio value: ${results_df['Portfolio Value'].min():.2f}")
-        logger.info(f"Results saved to: {output_path}")
+    def _get_position_map(self) -> Dict[int, float]:
+        """
+        Get position sizing based on signal strength.
 
-        return results_df
-    #
-    # def add_data(self, df: pd.DataFrame, signals: Dict) -> None:
-    #     """Add ticker data and signals"""
-    #     self.data = df
-    #     # Convert all signal keys to date strings without time
-    #     self.signals = {
-    #         pd.Timestamp(k).strftime('%Y-%m-%d'): v
-    #         for k, v in signals.items()
-    #     }
-    #
-    #     # Debug logging
-    #     logger.info(f"=== Data and Signals after formatting ===")
-    #     logger.info(f"First few signal dates: {list(self.signals.keys())[:5]}")
-    #     logger.info(f"First few DataFrame dates: {[d.strftime('%Y-%m-%d') for d in self.data.index[:5]]}")
-    #
-    # def run(self) -> pd.DataFrame:
-    #     """Run backtest and return results DataFrame"""
-    #     results = []
-    #
-    #     # Create output directory if it doesn't exist
-    #     output_dir = os.path.join(os.getcwd(), 'backtest_results')
-    #     os.makedirs(output_dir, exist_ok=True)
-    #
-    #     for date in self.data.index:
-    #         # Convert DataFrame date to string format
-    #         date_str = date.strftime('%Y-%m-%d')
-    #         price = self.data.loc[date, 'Stock Price']
-    #
-    #         # Get signal for this date
-    #         signal = self.signals.get(date_str, {'strength': 0})
-    #
-    #         # Debug first few dates
-    #         if len(results) < 5:
-    #             logger.debug(f"Processing date {date_str}:")
-    #             logger.debug(f"  Signal found: {signal.get('strength', 0)}")
-    #             logger.debug(f"  Price: {price}")
-    #
-    #         # Calculate position size using signal
-    #         shares = self.calculate_position_size(signal, price)
-    #
-    #         # Calculate portfolio value
-    #         portfolio_value = shares * price + (self.current_capital - shares * price)
-    #
-    #         # Calculate cumulative return
-    #         cumulative_return = (portfolio_value / self.initial_capital) - 1
-    #
-    #         # Store results
-    #         results.append({
-    #             'Date': date,
-    #             'Stock Price': price,
-    #             'Shares Held': shares,
-    #             'Signal': signal.get('strength', 0),
-    #             'Portfolio Value': portfolio_value,
-    #             'Cumulative Return': cumulative_return,
-    #             'Signal Confidence': signal.get('confidence', {}).get('overall', 0)
-    #         })
-    #
-    #         # Update capital for next iteration
-    #         self.current_capital = portfolio_value
-    #
-    #     # Convert to DataFrame
-    #     results_df = pd.DataFrame(results)
-    #
-    #     # Save to Excel in backtest_results directory
-    #     output_path = os.path.join(output_dir, f"backtest_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
-    #     results_df.to_excel(output_path, index=False)
-    #     logger.info(f"Results saved to: {output_path}")
-    #
-    #     # Log statistics
-    #     if len(results) > 0:
-    #         logger.info(f"\nBacktest Statistics:")
-    #         logger.info(f"Total days processed: {len(results)}")
-    #         logger.info(f"Days with non-zero signals: {sum(1 for r in results if r['Signal'] != 0)}")
-    #         logger.info(f"Final portfolio value: ${results[-1]['Portfolio Value']:,.2f}")
-    #         logger.info(f"Total return: {results[-1]['Cumulative Return']:.2%}")
-    #
-    #     # Just return the DataFrame
-    #     return results_df
-
-    def calculate_position_size(self, signal: Dict, price: float) -> float:
-        """Calculate position size based on signal strength"""
-        signal_scale = {
-            2: 1.00,  # Strong Buy  = 100% of capital
-            1: 0.75,  # Buy         = 75% of capital
-            0: 0.50,  # Neutral     = 50% of capital
-            -1: 0.25,  # Sell        = 25% of capital
-            -2: 0.00  # Strong Sell = 0% of capital
+        Returns:
+            Dictionary mapping signal strength to position percentage
+        """
+        return {
+            -2: 0.50,   # Strong sell = 50% invested
+            -1: 0.625,  # Sell = 62.5%
+            0: 0.75,    # Neutral = 75%
+            1: 0.875,   # Buy = 87.5%
+            2: 1.0      # Strong buy = 100%
         }
 
-        strength = signal.get('strength', 0)
-        allocation = signal_scale.get(strength, 0.0)
-        shares = (self.current_capital * allocation) / price if price > 0 else 0
+    def _calculate_trade_cost(self, shares: float, price: float) -> float:
+        """
+        Calculate transaction costs including commission and slippage.
 
-        if shares > 0:
-            logger.debug(f"Calculated position: Signal={strength}, Allocation={allocation}, Shares={shares:.2f}")
+        Args:
+            shares: Number of shares traded
+            price: Price per share
 
-        return shares
+        Returns:
+            Total transaction cost
+        """
+        if shares == 0:
+            return 0.0
+
+        trade_value = abs(shares * price)
+        commission_cost = trade_value * self.commission
+        slippage_cost = trade_value * self.slippage
+
+        return commission_cost + slippage_cost
+
+    def _save_results(self):
+        """Save backtest results to Excel file."""
+        if self.results is None:
+            return
+
+        output_dir = Path('backtest_results')
+        output_dir.mkdir(exist_ok=True)
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_path = output_dir / f"{self.ticker}_backtest_{timestamp}.xlsx"
+
+        try:
+            self.results.to_excel(output_path, index=False, engine='openpyxl')
+            logger.info(f"Results saved to: {output_path}")
+        except Exception as e:
+            logger.error(f"Failed to save Excel file: {e}")
+            csv_path = output_path.with_suffix('.csv')
+            self.results.to_csv(csv_path, index=False)
+            logger.info(f"Results saved as CSV to: {csv_path}")
+
+    def _log_summary(self):
+        """Log backtest performance summary."""
+        if self.results is None or len(self.results) == 0:
+            return
+
+        final_value = self.results['Portfolio Value'].iloc[-1]
+        total_return = (final_value - self.initial_capital) / self.initial_capital
+        max_value = self.results['Portfolio Value'].max()
+        min_value = self.results['Portfolio Value'].min()
+
+        # Calculate drawdown
+        cumulative_max = self.results['Portfolio Value'].cummax()
+        drawdown = (self.results['Portfolio Value'] - cumulative_max) / cumulative_max
+        max_drawdown = drawdown.min()
+
+        # Calculate Sharpe ratio (annualized)
+        returns = self.results['Portfolio Value'].pct_change().dropna()
+        sharpe_ratio = np.sqrt(252) * returns.mean() / returns.std() if len(returns) > 0 else 0
+
+        # Total costs
+        total_costs = self.results['Trade Cost'].sum()
+
+        logger.info("\n" + "="*60)
+        logger.info("BACKTEST SUMMARY")
+        logger.info("="*60)
+        logger.info(f"Ticker: {self.ticker}")
+        logger.info(f"Period: {self.results['Date'].iloc[0]} to {self.results['Date'].iloc[-1]}")
+        logger.info(f"Trading Days: {len(self.results)}")
+        logger.info(f"\nInitial Capital: ${self.initial_capital:,.2f}")
+        logger.info(f"Final Value: ${final_value:,.2f}")
+        logger.info(f"Total Return: {total_return:.2%}")
+        logger.info(f"\nMax Value: ${max_value:,.2f}")
+        logger.info(f"Min Value: ${min_value:,.2f}")
+        logger.info(f"Max Drawdown: {max_drawdown:.2%}")
+        logger.info(f"\nSharpe Ratio: {sharpe_ratio:.2f}")
+        logger.info(f"Total Transaction Costs: ${total_costs:,.2f}")
+        logger.info(f"Cost as % of Returns: {(total_costs/abs(final_value-self.initial_capital)*100):.2f}%")
+        logger.info("="*60)
+
+    def get_metrics(self) -> Dict:
+        """
+        Calculate comprehensive performance metrics.
+
+        Returns:
+            Dictionary of performance metrics
+        """
+        if self.results is None or len(self.results) == 0:
+            return {}
+
+        final_value = self.results['Portfolio Value'].iloc[-1]
+        total_return = (final_value - self.initial_capital) / self.initial_capital
+
+        # Calculate returns
+        returns = self.results['Portfolio Value'].pct_change().dropna()
+
+        # Drawdown
+        cumulative_max = self.results['Portfolio Value'].cummax()
+        drawdown = (self.results['Portfolio Value'] - cumulative_max) / cumulative_max
+        max_drawdown = drawdown.min()
+
+        # Sharpe and Sortino ratios
+        sharpe_ratio = np.sqrt(252) * returns.mean() / returns.std() if len(returns) > 0 else 0
+        downside_returns = returns[returns < 0]
+        sortino_ratio = np.sqrt(252) * returns.mean() / downside_returns.std() if len(downside_returns) > 0 else 0
+
+        # Win rate
+        winning_days = (returns > 0).sum()
+        total_trading_days = len(returns)
+        win_rate = winning_days / total_trading_days if total_trading_days > 0 else 0
+
+        # Calmar ratio
+        calmar_ratio = total_return / abs(max_drawdown) if max_drawdown != 0 else 0
+
+        return {
+            'total_return': total_return,
+            'final_value': final_value,
+            'max_drawdown': max_drawdown,
+            'sharpe_ratio': sharpe_ratio,
+            'sortino_ratio': sortino_ratio,
+            'win_rate': win_rate,
+            'calmar_ratio': calmar_ratio,
+            'total_trades': (self.results['Shares Traded'] != 0).sum(),
+            'avg_trade_size': self.results['Shares Traded'].abs().mean(),
+            'total_costs': self.results['Trade Cost'].sum()
+        }
