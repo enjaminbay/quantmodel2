@@ -2,8 +2,8 @@
 import pandas as pd
 import numpy as np
 from typing import Dict, Optional, Tuple
-from utils.logger import get_logger
-from utils.exceptions import DataProcessingError
+from quantmodel.utils.logger import get_logger
+from quantmodel.utils.exceptions import DataProcessingError
 
 logger = get_logger(__name__)
 

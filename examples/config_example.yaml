@@ -1,0 +1,86 @@
+# Example configuration file for QuantModel
+# Copy this file and modify as needed
+
+api:
+  alpha_vantage_key: "YOUR_API_KEY_HERE"
+  max_retries: 3
+  retry_delay: 5.0
+
+paths:
+  data_directory: "./data"
+  results_directory: "./results"
+  log_directory: "./logs"
+
+trading:
+  initial_capital: 10000.0
+  position_size_limit: 0.95
+  slippage: 0.0005
+  commission: 0.001
+
+  # Risk management
+  max_drawdown: 0.20
+  stop_loss: 0.05
+  take_profit: 0.15
+  max_positions: 5
+  correlation_threshold: 0.7
+  risk_free_rate: 0.02
+
+  # Position sizing
+  position_sizing_method: "risk_parity"
+  max_position_size: 0.25
+
+backtest:
+  num_days: 50
+  iterations: 500
+  lookback_window: 100
+  amount_of_trading_days: 10000
+  time_frame: "daily"  # "daily" or "weekly"
+  benchmark: "SPY"
+  rebalance_frequency: "daily"
+
+ml:
+  model_type: "random_forest"  # "random_forest", "gradient_boost", "logistic", "svm"
+  min_confidence: 0.6
+  lookback_window: 50
+  train_size: 0.8
+
+  # Feature configuration
+  feature_columns:
+    - "Bin_Predicted_Move_mean"
+    - "Bin_Predicted_Move_std"
+    - "Bin_Confidence_mean"
+
+  # Model parameters
+  model_params:
+    n_estimators: 150
+    max_depth: 5
+    min_samples_split: 10
+    min_samples_leaf: 5
+    class_weight: "balanced"
+    random_state: 42
+
+  # Statistical thresholds
+  min_samples: 15
+  min_correlation: 0.05
+  max_p_value: 0.075
+  confidence_level: 0.90
+
+log:
+  level: "INFO"  # "DEBUG", "INFO", "WARNING", "ERROR"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_name: "trading_system.log"
+  console_output: true
+
+# Indicators to use (name: [function, period])
+indicators:
+  SMA20: ["SMA", 20]
+  SMA50: ["SMA", 50]
+  RSI: ["RSI", 14]
+  MACD: ["MACD", null]
+
+# Base indicators list
+base_indicators:
+  - SMA20
+  - SMA50
+  - RSI
+  - MACD

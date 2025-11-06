@@ -6,9 +6,9 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Optional, List, Union
 from abc import ABC, abstractmethod
-from utils.logger import get_logger
-from utils.config import Config
-from utils.exceptions import DataFetchError
+from quantmodel.utils.logger import get_logger
+from quantmodel.utils.config import Config
+from quantmodel.utils.exceptions import DataFetchError
 
 logger = get_logger(__name__)
 

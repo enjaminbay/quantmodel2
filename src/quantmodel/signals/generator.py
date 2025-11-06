@@ -2,7 +2,7 @@ from typing import Dict, List, Tuple, Optional
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
-from utils.logger import get_logger
+from quantmodel.utils.logger import get_logger
 import os
 import pickle
 from datetime import datetime

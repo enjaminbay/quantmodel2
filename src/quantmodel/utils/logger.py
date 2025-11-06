@@ -7,7 +7,7 @@ import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from utils.config import Config
+    from quantmodel.utils.config import Config
 
 def setup_logger(name: str, config=None) -> logging.Logger:
     """Set up logger with both file and console handlers."""

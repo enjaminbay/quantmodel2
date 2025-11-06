@@ -3,7 +3,7 @@ import numpy as np
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 import os
-from utils.logger import get_logger
+from quantmodel.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

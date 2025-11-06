@@ -2,7 +2,7 @@ from typing import Dict
 import pandas as pd
 import os
 from datetime import datetime
-from utils.logger import get_logger
+from quantmodel.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
