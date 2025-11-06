@@ -1,7 +1,7 @@
 from typing import Dict, List
 import numpy as np
 from scipy import stats
-from utils.logger import get_logger
+from quantmodel.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

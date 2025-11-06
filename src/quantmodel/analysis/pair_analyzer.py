@@ -3,8 +3,8 @@
 import pandas as pd
 import numpy as np
 from typing import Dict, Optional, List, Tuple
-from utils.logger import get_logger
-from utils.exceptions import PairAnalysisError
+from quantmodel.utils.logger import get_logger
+from quantmodel.utils.exceptions import PairAnalysisError
 from scipy import stats
 from .processor import BinProcessor
 

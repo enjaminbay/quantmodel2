@@ -1,8 +1,8 @@
 # analysis/binning/stats_interface.py
 
 from typing import Dict, List, Tuple
-from utils.logger import get_logger
-from utils.exceptions import StatisticsError
+from quantmodel.utils.logger import get_logger
+from quantmodel.utils.exceptions import StatisticsError
 import numpy as np
 import pandas as pd
 import os

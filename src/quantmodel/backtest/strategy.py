@@ -2,8 +2,8 @@ from typing import Dict, Optional, Tuple
 import pandas as pd
 from dataclasses import dataclass
 from datetime import datetime
-from .config import BacktestConfig
-from utils.logger import get_logger
+from quantmodel.utils.config import BacktestConfig
+from quantmodel.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

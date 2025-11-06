@@ -3,7 +3,7 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional
 from scipy import stats
 from scipy.stats import gaussian_kde
-from utils.logger import get_logger
+from quantmodel.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

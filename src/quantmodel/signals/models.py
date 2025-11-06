@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Tuple
 from datetime import datetime
-from utils.logger import get_logger
+from quantmodel.utils.logger import get_logger
 from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 logger = get_logger(__name__)
 

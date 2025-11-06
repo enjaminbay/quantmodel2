@@ -1,9 +1,9 @@
 from typing import Dict, List, Optional, Tuple
 import pandas as pd
 from datetime import datetime
-from .config import BacktestConfig
+from quantmodel.utils.config import BacktestConfig
 from .strategy import Position
-from utils.logger import get_logger
+from quantmodel.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

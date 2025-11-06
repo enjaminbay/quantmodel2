@@ -4,8 +4,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import yfinance as yf
-from utils.logger import get_logger
-from utils.exceptions import DataError
+from quantmodel.utils.logger import get_logger
+from quantmodel.utils.exceptions import DataError
 from typing import Dict
 
 logger = get_logger(__name__)

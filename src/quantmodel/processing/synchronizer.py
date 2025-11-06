@@ -2,8 +2,8 @@
 
 from typing import Dict, TypedDict, Tuple
 import pandas as pd
-from utils.exceptions import DataSyncError
-from utils.logger import get_logger
+from quantmodel.utils.exceptions import DataSyncError
+from quantmodel.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
