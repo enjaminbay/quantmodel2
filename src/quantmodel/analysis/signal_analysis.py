@@ -1,7 +1,129 @@
-
 from typing import Dict, List, Tuple
 import pandas as pd
 import numpy as np
+from quantmodel.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+class SignalAnalyzer:
+    """Analyzes and reports on trading signal performance and statistics."""
+
+    def __init__(self):
+        """Initialize the SignalAnalyzer."""
+        pass
+
+    def analyze_signals(self, signals: Dict) -> Dict:
+        """
+        Analyze signal statistics and return metrics.
+
+        Args:
+            signals: Dictionary of generated signals
+
+        Returns:
+            Dictionary containing analysis metrics
+        """
+        if not signals:
+            logger.warning("No signals to analyze")
+            return {}
+
+        metrics = {
+            'total_signals': len(signals),
+            'active_signals': sum(1 for s in signals.values() if s['strength'] != 0),
+            'signal_distribution': self._get_signal_distribution(signals),
+            'confidence_metrics': self._get_confidence_metrics(signals),
+            'statistical_metrics': self._get_statistical_metrics(signals)
+        }
+
+        return metrics
+
+    def analyze_performance(self, df: pd.DataFrame) -> Dict:
+        """
+        Analyze signal performance against actual returns.
+
+        Args:
+            df: DataFrame with 'Signal' and 'Stock Pct Change' columns
+
+        Returns:
+            Dictionary containing performance metrics
+        """
+        if 'Signal' not in df.columns or 'Stock Pct Change' not in df.columns:
+            logger.warning("Required columns not found in DataFrame")
+            return {}
+
+        performance = {}
+
+        # Calculate performance by signal strength
+        for strength in [-2, -1, 0, 1, 2]:
+            mask = df['Signal'] == strength
+            if mask.any():
+                returns = df.loc[mask, 'Stock Pct Change']
+                performance[strength] = {
+                    'count': len(returns),
+                    'mean_return': float(returns.mean()),
+                    'std_dev': float(returns.std()),
+                    'win_rate': float((returns > 0).mean()),
+                    'max_gain': float(returns.max()),
+                    'max_loss': float(returns.min())
+                }
+
+        return performance
+
+    def print_statistics(self, signals: Dict):
+        """Print signal statistics to console."""
+        print_signal_statistics(signals)
+
+    def print_performance(self, df: pd.DataFrame):
+        """Print performance statistics to console."""
+        print_success_statistics(df)
+
+    def _get_signal_distribution(self, signals: Dict) -> Dict:
+        """Get distribution of signal strengths."""
+        distribution = {-2: 0, -1: 0, 0: 0, 1: 0, 2: 0}
+        for s in signals.values():
+            strength = s['strength']
+            distribution[strength] = distribution.get(strength, 0) + 1
+        return distribution
+
+    def _get_confidence_metrics(self, signals: Dict) -> Dict:
+        """Calculate confidence-related metrics."""
+        confidences = [s['confidence']['overall'] for s in signals.values()]
+        return {
+            'mean': float(np.mean(confidences)),
+            'median': float(np.median(confidences)),
+            'std_dev': float(np.std(confidences)),
+            'min': float(np.min(confidences)),
+            'max': float(np.max(confidences))
+        }
+
+    def _get_statistical_metrics(self, signals: Dict) -> Dict:
+        """Calculate statistical significance metrics."""
+        significance_scores = [
+            s['confidence']['metrics'].get('statistical_significance', 0)
+            for s in signals.values()
+        ]
+        agreement_scores = [
+            s['confidence']['metrics'].get('signal_agreement', 0)
+            for s in signals.values()
+        ]
+        accuracy_scores = [
+            s['confidence']['metrics'].get('historical_accuracy', 0)
+            for s in signals.values()
+        ]
+
+        return {
+            'statistical_significance': {
+                'mean': float(np.mean(significance_scores)),
+                'max': float(np.max(significance_scores)),
+                'min': float(np.min(significance_scores))
+            },
+            'signal_agreement': {
+                'mean': float(np.mean(agreement_scores))
+            },
+            'historical_accuracy': {
+                'mean': float(np.mean(accuracy_scores))
+            }
+        }
 
 
 def print_signal_statistics(signals: Dict):
